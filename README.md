@@ -2,7 +2,7 @@
 
 A HTML/Canvas/JavaScript missile intercept simulation game.
 
-*Play at: https://nodesocket.github.io/missle-intercept-sim/*
+*Play at: https://nodesocket.github.io/missile-intercept-sim/*
 
 _Coded with AI assistance from Cursor._ 
 
