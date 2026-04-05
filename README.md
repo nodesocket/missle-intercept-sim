@@ -1,2 +1,5 @@
-# missle-intercept-sim
-A html/javascript missile intercept simulator game.
+# Missle Intercept Sim
+
+A HTML/canvas/JavaScript missile intercept simulator game.
+
+Coded with AI assistance from Cursor.
