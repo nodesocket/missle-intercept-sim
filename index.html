@@ -1,0 +1,1600 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Missile Intercept Sim</title>
+<style>
+  :root {
+    --bg: #08101f;
+    --panel: rgba(15, 23, 42, 0.92);
+    --panel2: rgba(30, 41, 59, 0.92);
+    --text: #eef6ff;
+    --muted: #a8b8d8;
+    --accent: #7dd3fc;
+    --good: #4ade80;
+    --bad: #fb7185;
+    --warn: #fbbf24;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+    background: radial-gradient(circle at top, #0d1a35 0%, #08101f 55%, #060b15 100%);
+    color: var(--text);
+  }
+  .wrap {
+    max-width: 1240px;
+    margin: 0 auto;
+    padding: 16px;
+  }
+  h1 {
+    margin: 0 0 8px;
+    font-size: 1.55rem;
+  }
+  p.desc {
+    margin: 0 0 16px;
+    color: var(--muted);
+    line-height: 1.45;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 330px 1fr;
+    gap: 16px;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid rgba(180, 200, 255, 0.12);
+    border-radius: 16px;
+    padding: 14px;
+    box-shadow: 0 14px 28px rgba(0,0,0,.28);
+    backdrop-filter: blur(6px);
+  }
+  .canvas-panel { padding: 10px; }
+  canvas {
+    width: 100%;
+    height: auto;
+    display: block;
+    background: linear-gradient(180deg, #244a85 0%, #4f86d1 24%, #89c1ff 48%, #dceffd 58%, #b8d8f0 72%, #6fa3c8 88%, #4a7aa8 100%);
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,.18);
+  }
+  .control-card {
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px;
+    padding: 12px;
+    margin-bottom: 14px;
+  }
+  .control-card h2 {
+    font-size: 1rem;
+    margin: 0 0 8px;
+  }
+  .small {
+    color: var(--muted);
+    font-size: .92rem;
+    line-height: 1.42;
+  }
+  .big-angle {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--accent);
+    margin: 8px 0 6px;
+    font-variant-numeric: tabular-nums;
+  }
+  .key-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+  }
+  .key {
+    background: rgba(255,255,255,.08);
+    border: 1px solid rgba(255,255,255,.12);
+    border-bottom-width: 3px;
+    border-radius: 10px;
+    padding: 8px 10px;
+    min-width: 54px;
+    text-align: center;
+    font-weight: 800;
+    color: #e7f2ff;
+  }
+  .btns {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+  }
+  button {
+    border: 0;
+    background: var(--panel2);
+    color: var(--text);
+    padding: 10px 12px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-weight: 800;
+  }
+  button.primary { background: #2563eb; }
+  button.good { background: #15803d; }
+  button:hover { filter: brightness(1.08); }
+  .stat {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 8px;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    font-variant-numeric: tabular-nums;
+  }
+  .stat:last-child { border-bottom: 0; }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  .status {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255,255,255,.06);
+    min-height: 52px;
+    line-height: 1.35;
+  }
+  .status.good { border: 1px solid rgba(74, 222, 128, .35); color: #dcfce7; }
+  .status.bad { border: 1px solid rgba(251, 113, 133, .35); color: #ffe4e6; }
+  .status.warn { border: 1px solid rgba(251, 191, 36, .35); color: #fef3c7; }
+  .footer-note {
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: .85rem;
+    line-height: 1.45;
+  }
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Missile Intercept Sim</h1>
+  <p class="desc">
+    Random jets appear one at a time between <strong>10,000 and 40,000 ft</strong> and between <strong>Mach 0.6 and Mach 2</strong>.
+    Your missile always flies in a straight line at constant <strong>Mach 2</strong>. Use the keyboard to aim and fire.
+  </p>
+
+  <div class="layout">
+    <div class="panel">
+      <div class="control-card">
+        <h2>Aim controls</h2>
+        <div class="big-angle" id="angleValue">60°</div>
+        <div class="small">Use <strong>↑</strong> and <strong>↓</strong> to change the missile angle <strong>before firing</strong> (aim locks after launch). Each tap moves <strong>1°</strong>; hold the key for <strong>5°</strong> steps. Press <strong>Space</strong> to fire.</div>
+        <div class="key-row">
+          <div class="key">↑</div>
+          <div class="key">↓</div>
+          <div class="key">Space</div>
+        </div>
+      </div>
+
+      <div class="btns" id="startBar">
+        <button id="startBtn" class="primary">Start game</button>
+      </div>
+
+      <div>
+        <div class="stat"><span>Jet altitude</span><span id="planeAlt" class="mono">—</span></div>
+        <div class="stat"><span>Jet speed</span><span id="planeMach" class="mono">—</span></div>
+        <div class="stat"><span>Missle angle</span><span id="currentAngleStat" class="mono">—</span></div>
+        <div class="stat"><span>Time to jet overhead</span><span id="timeToOverhead" class="mono">—</span></div>
+        <div class="stat"><span>Missile state</span><span id="missileState" class="mono">Ready</span></div>
+        <div class="stat"><span>Score</span><span id="score" class="mono">0 / 0</span></div>
+      </div>
+
+      <div id="status" class="status warn">
+        Press <strong>Start game</strong> once to begin (the button then goes away). Aim with the arrow keys and fire with <strong>Space</strong>. After each engagement, a new jet arrives automatically after a short beat.
+      </div>
+
+      <div class="footer-note">
+        The jet always flies left to right and passes directly over the launcher. Missiles self-destruct at <strong>50,000 ft</strong>.
+      </div>
+    </div>
+
+    <div class="panel canvas-panel">
+      <canvas id="sim" width="900" height="560"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const SPEED_OF_SOUND_FTPS = 1116;
+  const MISSILE_SPEED = 2 * SPEED_OF_SOUND_FTPS;
+  const HIT_RADIUS_FT = 800;
+  const MISSILE_SELF_DESTRUCT_FT = 50000;
+  const MISSILE_TRAIL_MAX_POINTS = 90;
+  const PLANE_DRAW_SCALE = 1.1 * 0.7 * 1.1;
+  /** Nose extent in canvas px (local ~45 × draw scale) — tooltip hides before nose exits */
+  const PLANE_RIGHT_EXTENT_PX = Math.ceil(45 * PLANE_DRAW_SCALE);
+  /** Wall-clock delays before spawnPlane so explosions / wreck can play (ms). */
+  const RESPAWN_AFTER_HIT_MS = 3200;
+  const RESPAWN_AFTER_SELF_DESTRUCT_MS = 1400;
+  const RESPAWN_AFTER_MISSILE_OOB_MS = 1100;
+  const RESPAWN_AFTER_PLANE_ESCAPED_MS = 500;
+  const canvas = document.getElementById('sim');
+  const ctx = canvas.getContext('2d');
+
+  const angleValue = document.getElementById('angleValue');
+  const planeAltEl = document.getElementById('planeAlt');
+  const planeMachEl = document.getElementById('planeMach');
+  const timeToOverheadEl = document.getElementById('timeToOverhead');
+  const currentAngleStatEl = document.getElementById('currentAngleStat');
+  const missileStateEl = document.getElementById('missileState');
+  const scoreEl = document.getElementById('score');
+  const statusEl = document.getElementById('status');
+
+  const startBtn = document.getElementById('startBtn');
+  const startBar = document.getElementById('startBar');
+
+  const world = {
+    widthFt: 90000,
+    heightFt: 56000,
+    launcherX: 45000,
+    groundY: 0
+  };
+
+  let sessionStarted = false;
+  let roundActive = false;
+  let simTime = 0;
+  let lastFrame = performance.now();
+  let hits = 0;
+  let rounds = 0;
+  let plane = null;
+  let missile = null;
+  let outcomeResolved = false;
+  let angleDeg = 60;
+  let explosions = [];
+  /** When `performance.now()` reaches this, call spawnPlane (wall clock, not sim time). */
+  let autoRespawnAtMs = null;
+  const SIM_SPEED_MULTIPLIER = 28;
+
+  function scheduleRespawn(delayMs) {
+    autoRespawnAtMs = performance.now() + delayMs;
+  }
+
+  function fmt(n, digits = 1) {
+    return Number(n).toFixed(digits);
+  }
+
+  function clamp(v, min, max) {
+    return Math.min(max, Math.max(min, v));
+  }
+
+  function planeIsSupersonic(p) {
+    return p != null && typeof p.mach === 'number' && p.mach >= 1;
+  }
+
+  function distancePointToSegment(px, py, x1, y1, x2, y2) {
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const lenSq = dx * dx + dy * dy;
+    if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+    let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+    t = clamp(t, 0, 1);
+    const cx = x1 + t * dx;
+    const cy = y1 + t * dy;
+    return Math.hypot(px - cx, py - cy);
+  }
+
+  function relativeSegmentHitRadius(mPrevX, mPrevY, mX, mY, pPrevX, pPrevY, pX, pY, radius) {
+    const rx0 = mPrevX - pPrevX;
+    const ry0 = mPrevY - pPrevY;
+    const rx1 = mX - pX;
+    const ry1 = mY - pY;
+    return distancePointToSegment(0, 0, rx0, ry0, rx1, ry1) <= radius;
+  }
+
+  /** Fuselage hit zone: shorter behind center (tail, −X) vs nose (+X), feet */
+  const PLANE_HIT_TAIL_HALF_FT = 1400;
+  const PLANE_HIT_NOSE_HALF_FT = 4000;
+
+  function planeBodySegment(px, py) {
+    return {
+      x1: px - PLANE_HIT_TAIL_HALF_FT,
+      y1: py,
+      x2: px + PLANE_HIT_NOSE_HALF_FT,
+      y2: py
+    };
+  }
+
+  function distSqPointSeg(px, py, ax, ay, bx, by) {
+    const abx = bx - ax;
+    const aby = by - ay;
+    const apx = px - ax;
+    const apy = py - ay;
+    const abLenSq = abx * abx + aby * aby;
+    if (abLenSq === 0) return apx * apx + apy * apy;
+    let t = (apx * abx + apy * aby) / abLenSq;
+    t = clamp(t, 0, 1);
+    const cx = ax + t * abx;
+    const cy = ay + t * aby;
+    const dx = px - cx;
+    const dy = py - cy;
+    return dx * dx + dy * dy;
+  }
+
+  function distSegSeg(ax, ay, bx, by, cx, cy, dx, dy) {
+    function segPointDistSq(px, py, sx1, sy1, sx2, sy2) {
+      return distSqPointSeg(px, py, sx1, sy1, sx2, sy2);
+    }
+    let minSq = segPointDistSq(ax, ay, cx, cy, dx, dy);
+    minSq = Math.min(minSq, segPointDistSq(bx, by, cx, cy, dx, dy));
+    minSq = Math.min(minSq, segPointDistSq(cx, cy, ax, ay, bx, by));
+    minSq = Math.min(minSq, segPointDistSq(dx, dy, ax, ay, bx, by));
+    return Math.sqrt(minSq);
+  }
+
+  function missileHitsPlaneBody(mPrevX, mPrevY, mX, mY, pPrevX, pPrevY, pX, pY) {
+    const prevSeg = planeBodySegment(pPrevX, pPrevY);
+    const currSeg = planeBodySegment(pX, pY);
+    const r = HIT_RADIUS_FT;
+    if (Math.hypot(mX - pX, mY - pY) <= r) return true;
+    if (distSqPointSeg(mX, mY, currSeg.x1, currSeg.y1, currSeg.x2, currSeg.y2) <= r * r) return true;
+    if (distSqPointSeg(mPrevX, mPrevY, currSeg.x1, currSeg.y1, currSeg.x2, currSeg.y2) <= r * r) return true;
+    if (distSegSeg(mPrevX, mPrevY, mX, mY, currSeg.x1, currSeg.y1, currSeg.x2, currSeg.y2) <= r) return true;
+    if (distSegSeg(mPrevX, mPrevY, mX, mY, prevSeg.x1, prevSeg.y1, prevSeg.x2, prevSeg.y2) <= r) return true;
+    return relativeSegmentHitRadius(mPrevX, mPrevY, mX, mY, pPrevX, pPrevY, pX, pY, r);
+  }
+
+  function setStatus(text, kind = 'warn') {
+    statusEl.className = `status ${kind}`;
+    statusEl.innerHTML = text;
+  }
+
+  function updateAngleLabels() {
+    angleValue.textContent = `${Math.round(angleDeg)}°`;
+    currentAngleStatEl.textContent = `${Math.round(angleDeg)}°`;
+  }
+
+  function randomRange(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  function spawnPlane() {
+    autoRespawnAtMs = null;
+    const altitude = Math.round(randomRange(10000, 40000) / 100) * 100;
+    const mach = Math.round(randomRange(0.6, 2) * 10) / 10;
+    const speed = mach * SPEED_OF_SOUND_FTPS;
+    const spawnX = 6000;
+    const distanceToOverhead = world.launcherX - spawnX;
+    const timeToOverheadFromSpawn = distanceToOverhead / speed;
+
+    plane = {
+      spawnX,
+      x: spawnX,
+      y: altitude,
+      mach,
+      speed,
+      altitude,
+      timeToOverheadFromSpawn,
+      destroyed: false,
+      crashing: false,
+      crashVx: 0,
+      crashVy: 0,
+      fireTimer: 0,
+      wreckAngle: 0,
+      wreckSpin: 0,
+      wreckRestAngle: 0,
+      prevX: spawnX,
+      prevY: altitude,
+      grounded: false
+    };
+
+    missile = {
+      active: false,
+      launched: false,
+      x: world.launcherX,
+      y: 0,
+      vx: 0,
+      vy: 0,
+      angleDeg,
+      trail: [],
+      launchTime: null,
+      flightDuration: null,
+      prevX: world.launcherX,
+      prevY: 0
+    };
+
+    simTime = 0;
+    outcomeResolved = false;
+    roundActive = true;
+    explosions = [];
+
+    planeAltEl.textContent = `${plane.altitude.toLocaleString()} ft`;
+    planeMachEl.textContent = `Mach ${fmt(plane.mach, 1)}`;
+    timeToOverheadEl.textContent = `${fmt(plane.timeToOverheadFromSpawn, 1)} s`;
+    missileStateEl.textContent = 'Ready';
+    updateAngleLabels();
+
+    setStatus(
+      `New jet: <strong>${plane.altitude.toLocaleString()} ft</strong> at <strong>Mach ${fmt(plane.mach, 1)}</strong>. ` +
+      `Aim with <strong>↑</strong> and <strong>↓</strong>, then fire with <strong>Space</strong>.`,
+      'warn'
+    );
+  }
+
+  function deactivateMissile() {
+    if (missile && missile.launchTime != null) {
+      missile.flightDuration = simTime - missile.launchTime;
+    }
+    if (missile) missile.active = false;
+  }
+
+  function launchMissile() {
+    if (!plane || !missile || missile.launched || outcomeResolved) return;
+    const angleRad = angleDeg * Math.PI / 180;
+    missile.vx = MISSILE_SPEED * Math.cos(angleRad);
+    missile.vy = MISSILE_SPEED * Math.sin(angleRad);
+    missile.launched = true;
+    missile.active = true;
+    missile.angleDeg = angleDeg;
+    missile.x = world.launcherX;
+    missile.y = 0;
+    missile.launchTime = simTime;
+    missile.flightDuration = null;
+    missile.prevX = missile.x;
+    missile.prevY = missile.y;
+    missile.trail = [{ x: missile.x, y: missile.y }];
+    missileStateEl.textContent = `Launched @ ${Math.round(missile.angleDeg)}°`;
+
+    const rel = simTime - plane.timeToOverheadFromSpawn;
+    setStatus(
+      `Missile launched at <strong>${Math.round(missile.angleDeg)}°</strong> ` +
+      `and <strong>${rel >= 0 ? '+' : ''}${fmt(rel, 1)} s</strong> relative to jet overhead.`,
+      'warn'
+    );
+  }
+
+  function createExplosion(x, y, kind = 'small') {
+    const count = kind === 'big' ? 28 : 16;
+    const particles = [];
+    for (let i = 0; i < count; i++) {
+      const speed = (kind === 'big' ? 1600 : 900) * (0.45 + Math.random());
+      const ang = Math.random() * Math.PI * 2;
+      particles.push({
+        x,
+        y,
+        vx: Math.cos(ang) * speed,
+        vy: Math.sin(ang) * speed,
+        size: (kind === 'big' ? 1500 : 900) * (0.5 + Math.random()),
+        life: 0.85 + Math.random() * (kind === 'big' ? 0.7 : 0.35),
+        maxLife: 0.85 + Math.random() * (kind === 'big' ? 0.7 : 0.35),
+        hue: Math.random()
+      });
+    }
+    explosions.push({ x, y, age: 0, life: kind === 'big' ? 1.2 : 0.75, radius: kind === 'big' ? 3400 : 1800, kind, particles });
+  }
+
+  function resolveRound(hit) {
+    if (outcomeResolved) return;
+    outcomeResolved = true;
+    if (!hit) roundActive = false;
+    rounds += 1;
+    if (hit) hits += 1;
+    scoreEl.textContent = `${hits} / ${rounds}`;
+    missileStateEl.textContent = hit ? 'Hit' : (missile?.launched ? 'Missed' : 'Expired');
+
+    if (hit) {
+      setStatus(
+        `Hit. Jet at <strong>${plane.altitude.toLocaleString()} ft</strong>, Mach <strong>${fmt(plane.mach, 1)}</strong>. ` +
+        `The jet is going down in flames.`,
+        'good'
+      );
+    } else {
+      setStatus(
+        `Miss. Jet was <strong>${plane.altitude.toLocaleString()} ft</strong> at Mach <strong>${fmt(plane.mach, 1)}</strong>. ` +
+        `Try a different launch angle or fire timing.`,
+        'bad'
+      );
+    }
+  }
+
+  function update(dt) {
+    if (!sessionStarted || !plane) return;
+
+    simTime += dt;
+
+    plane.prevX = plane.x;
+    plane.prevY = plane.y;
+
+    if (!plane.crashing && !plane.grounded) {
+      plane.x = plane.spawnX + plane.speed * simTime;
+    } else if (plane.crashing) {
+      plane.x += plane.crashVx * dt;
+      plane.y = Math.max(0, plane.y + plane.crashVy * dt);
+      plane.crashVy -= 620 * dt;
+      plane.crashVx *= (1 - 0.045 * dt);
+      plane.wreckAngle += plane.wreckSpin * dt;
+      plane.wreckSpin += 1.1 * dt;
+      plane.wreckSpin = Math.min(plane.wreckSpin, 3.2);
+      if (plane.wreckAngle > 1.35) {
+        plane.wreckAngle = 1.35;
+        plane.wreckSpin *= 0.65;
+      }
+      plane.fireTimer += dt;
+      if (plane.fireTimer > 0.07) {
+        plane.fireTimer = 0;
+        createExplosion(plane.x + randomRange(-400, 200), plane.y + randomRange(-200, 400), 'small');
+      }
+      if (plane.y <= 0) {
+        plane.y = 0;
+        plane.crashing = false;
+        plane.grounded = true;
+        plane.crashVx = 0;
+        plane.crashVy = 0;
+        plane.wreckSpin = 0;
+        plane.wreckRestAngle = 0.58 + randomRange(0, 0.12);
+        createExplosion(plane.x, randomRange(500, 1100), 'big');
+        createExplosion(plane.x + randomRange(-1400, -400), randomRange(400, 900), 'small');
+        createExplosion(plane.x + randomRange(400, 1400), randomRange(400, 900), 'small');
+        roundActive = false;
+        if (plane.destroyed) {
+          scheduleRespawn(RESPAWN_AFTER_HIT_MS);
+        }
+      }
+    } else if (plane.grounded) {
+      plane.y = 0;
+      plane.wreckAngle += (plane.wreckRestAngle - plane.wreckAngle) * Math.min(1, dt * 4.2);
+      plane.fireTimer += dt;
+      if (plane.fireTimer > 0.1) {
+        plane.fireTimer = 0;
+        createExplosion(
+          plane.x + randomRange(-900, 900),
+          randomRange(350, 950),
+          'small'
+        );
+      }
+    }
+
+    const tOver = plane.timeToOverheadFromSpawn - simTime;
+    timeToOverheadEl.textContent = `${tOver >= 0 ? '' : '-'}${fmt(Math.abs(tOver), 1)} s`;
+
+    if (missile.active) {
+      missile.prevX = missile.x;
+      missile.prevY = missile.y;
+      missile.x += missile.vx * dt;
+      missile.y += missile.vy * dt;
+      missile.trail.push({ x: missile.x, y: missile.y });
+      if (missile.trail.length > MISSILE_TRAIL_MAX_POINTS) missile.trail.shift();
+    }
+
+    for (const ex of explosions) {
+      ex.age += dt;
+      for (const pt of ex.particles) {
+        pt.life -= dt;
+        pt.x += pt.vx * dt;
+        pt.y += pt.vy * dt;
+        pt.vx *= (1 - 0.9 * dt);
+        pt.vy *= (1 - 0.9 * dt);
+      }
+      ex.particles = ex.particles.filter(pt => pt.life > 0);
+    }
+    explosions = explosions.filter(ex => ex.age < ex.life || ex.particles.length);
+
+    if (!plane.destroyed && missile.active) {
+      const hit = missileHitsPlaneBody(
+        missile.prevX, missile.prevY, missile.x, missile.y,
+        plane.prevX, plane.prevY, plane.x, plane.y
+      );
+
+      if (hit) {
+        deactivateMissile();
+        plane.destroyed = true;
+        plane.crashing = true;
+        plane.crashVx = plane.speed * 0.62;
+        plane.crashVy = -1150;
+        plane.wreckAngle = 0.28;
+        plane.wreckSpin = 1.35;
+        createExplosion(plane.x, plane.y, 'big');
+        createExplosion(plane.x - 1000, plane.y + 300, 'small');
+        resolveRound(true);
+      }
+    }
+
+    if (!outcomeResolved) {
+      if (!plane.grounded && plane.x > world.widthFt + 6000) {
+        resolveRound(false);
+        scheduleRespawn(RESPAWN_AFTER_PLANE_ESCAPED_MS);
+      } else if (missile.launched && missile.active && missile.y >= MISSILE_SELF_DESTRUCT_FT) {
+        deactivateMissile();
+        createExplosion(missile.x, missile.y, 'small');
+        missileStateEl.textContent = 'Self-destruct';
+        setStatus('Missile self-destructed at <strong>50,000 ft</strong>. Explosion triggered and this counts as a miss.', 'bad');
+        resolveRound(false);
+        scheduleRespawn(RESPAWN_AFTER_SELF_DESTRUCT_MS);
+      } else if (missile.launched && (
+        missile.x > world.widthFt + 6000 ||
+        missile.y < -1000
+      )) {
+        createExplosion(missile.x, Math.max(missile.y, 0), 'small');
+        deactivateMissile();
+        resolveRound(false);
+        scheduleRespawn(RESPAWN_AFTER_MISSILE_OOB_MS);
+      }
+    }
+
+    if (sessionStarted && autoRespawnAtMs != null && performance.now() >= autoRespawnAtMs) {
+      autoRespawnAtMs = null;
+      spawnPlane();
+    }
+  }
+
+  function toCanvasX(xFt) {
+    return (xFt / world.widthFt) * canvas.width;
+  }
+
+  function toCanvasY(yFt) {
+    const topPadFt = 2500;
+    return canvas.height - ((yFt + topPadFt) / (world.heightFt + topPadFt)) * (canvas.height - 24) - 10;
+  }
+
+  function drawSkyDecor() {
+    ctx.save();
+    ctx.globalAlpha = 0.18;
+    for (let i = 0; i < 4; i++) {
+      const x = 110 + i * 180;
+      const y = 90 + (i % 2) * 40;
+      ctx.beginPath();
+      ctx.ellipse(x, y, 42, 14, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + 28, y - 6, 38, 16, 0, 0, Math.PI * 2);
+      ctx.ellipse(x + 56, y + 1, 34, 13, 0, 0, Math.PI * 2);
+      ctx.fillStyle = '#ffffff';
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawGrid() {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(255,255,255,0.13)';
+    ctx.lineWidth = 1;
+
+    for (let alt = 10000; alt <= 50000; alt += 5000) {
+      const y = toCanvasY(alt);
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+
+      ctx.fillStyle = 'rgba(0,0,0,0.52)';
+      ctx.font = '12px system-ui';
+      ctx.fillText(`${alt.toLocaleString()} ft`, 10, y - 6);
+    }
+
+    ctx.restore();
+  }
+
+  function drawGround() {
+    const groundY = toCanvasY(0);
+    ctx.save();
+    ctx.fillStyle = '#8f7349';
+    ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+    ctx.fillStyle = '#6f5a3c';
+    for (let i = 0; i < canvas.width; i += 26) {
+      ctx.fillRect(i, groundY + 26 + (i % 3), 14, 2);
+    }
+    ctx.strokeStyle = 'rgba(0,0,0,.25)';
+    ctx.beginPath();
+    ctx.moveTo(0, groundY);
+    ctx.lineTo(canvas.width, groundY);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawLauncherScenery() {
+    const lx = toCanvasX(world.launcherX);
+    const gy = toCanvasY(0);
+    const w = canvas.width;
+
+    ctx.save();
+
+    ctx.fillStyle = '#8c8e93';
+    ctx.beginPath();
+    ctx.moveTo(0, gy + 18);
+    ctx.lineTo(0, gy - 42);
+    ctx.lineTo(w * 0.07, gy - 58);
+    ctx.lineTo(w * 0.14, gy - 28);
+    ctx.lineTo(w * 0.22, gy - 78);
+    ctx.lineTo(w * 0.3, gy - 48);
+    ctx.lineTo(w * 0.38, gy - 92);
+    ctx.lineTo(w * 0.46, gy - 36);
+    ctx.lineTo(w * 0.54, gy - 72);
+    ctx.lineTo(w * 0.62, gy - 44);
+    ctx.lineTo(w * 0.7, gy - 86);
+    ctx.lineTo(w * 0.78, gy - 32);
+    ctx.lineTo(w * 0.86, gy - 68);
+    ctx.lineTo(w * 0.93, gy - 50);
+    ctx.lineTo(w, gy - 38);
+    ctx.lineTo(w, gy + 18);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#6d6f74';
+    ctx.beginPath();
+    ctx.moveTo(0, gy + 16);
+    ctx.lineTo(0, gy - 28);
+    ctx.lineTo(w * 0.09, gy - 52);
+    ctx.lineTo(w * 0.18, gy - 22);
+    ctx.lineTo(w * 0.26, gy - 62);
+    ctx.lineTo(w * 0.35, gy - 18);
+    ctx.lineTo(w * 0.44, gy - 58);
+    ctx.lineTo(w * 0.52, gy - 34);
+    ctx.lineTo(w * 0.6, gy - 66);
+    ctx.lineTo(w * 0.68, gy - 26);
+    ctx.lineTo(w * 0.76, gy - 54);
+    ctx.lineTo(w * 0.84, gy - 20);
+    ctx.lineTo(w * 0.92, gy - 46);
+    ctx.lineTo(w, gy - 30);
+    ctx.lineTo(w, gy + 16);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#4a5d32';
+    ctx.beginPath();
+    ctx.moveTo(0, gy + 20);
+    ctx.quadraticCurveTo(w * 0.18, gy - 10, w * 0.32, gy + 6);
+    ctx.quadraticCurveTo(w * 0.42, gy - 6, lx - 78, gy + 5);
+    ctx.quadraticCurveTo(lx, gy + 9, lx + 78, gy + 6);
+    ctx.quadraticCurveTo(w * 0.62, gy - 8, w * 0.78, gy + 4);
+    ctx.quadraticCurveTo(w * 0.92, gy - 4, w, gy + 14);
+    ctx.lineTo(w, gy + 120);
+    ctx.lineTo(0, gy + 120);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(55,95,42,0.5)';
+    ctx.lineWidth = 1.1;
+    for (let gx = 0; gx < w; gx += 5.5) {
+      const gTop = gy + 9 + ((gx * 11) % 6);
+      ctx.beginPath();
+      ctx.moveTo(gx, gTop);
+      ctx.quadraticCurveTo(gx + 1.5, gTop - 5, gx + 3, gTop - 9);
+      ctx.stroke();
+    }
+
+    function drawTree(tx, ty, s) {
+      ctx.fillStyle = '#4a3d2e';
+      ctx.fillRect(tx - 2 * s, ty, 4 * s, 12 * s);
+      ctx.fillStyle = '#2a5230';
+      ctx.beginPath();
+      ctx.moveTo(tx, ty - 26 * s);
+      ctx.lineTo(tx - 13 * s, ty - 1);
+      ctx.lineTo(tx + 13 * s, ty - 1);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#3d6e3f';
+      ctx.beginPath();
+      ctx.moveTo(tx, ty - 36 * s);
+      ctx.lineTo(tx - 9 * s, ty - 14 * s);
+      ctx.lineTo(tx + 9 * s, ty - 14 * s);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    for (let i = 0; ; i++) {
+      const gx = 26 + i * 112 + ((i * 37) % 34);
+      if (gx > w - 26) break;
+      const hMix = (i * 53 + (i * i) % 19) % 78;
+      const s = 0.34 + hMix * 0.011;
+      const tyOff = ((i * 41) % 11) - 4;
+      drawTree(gx, gy + 5 + tyOff, s);
+    }
+
+    ctx.restore();
+  }
+
+  function drawLauncher() {
+    const x = toCanvasX(world.launcherX);
+    const y = toCanvasY(0);
+    const angleRad = angleDeg * Math.PI / 180;
+
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.scale(0.5, 0.5);
+    ctx.translate(-x, -y);
+
+    ctx.fillStyle = 'rgba(0,0,0,0.2)';
+    ctx.beginPath();
+    ctx.ellipse(x, y + 4, 44, 11, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const hullGrad = ctx.createLinearGradient(x - 50, y - 20, x + 50, y + 4);
+    hullGrad.addColorStop(0, '#243044');
+    hullGrad.addColorStop(0.2, '#3d4f66');
+    hullGrad.addColorStop(0.45, '#4a5f78');
+    hullGrad.addColorStop(0.55, '#3d4f66');
+    hullGrad.addColorStop(0.8, '#2a3545');
+    hullGrad.addColorStop(1, '#1a222e');
+    ctx.fillStyle = hullGrad;
+    ctx.beginPath();
+    ctx.roundRect(x - 36, y - 18, 72, 20, 7);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.4)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.beginPath();
+    ctx.roundRect(x - 35, y - 17, 70, 18, 6);
+    ctx.stroke();
+
+    const wheelY = y - 1;
+    for (const wx of [x - 22, x, x + 22]) {
+      const wg = ctx.createRadialGradient(wx - 2.5, wheelY - 2.5, 0, wx, wheelY, 10);
+      wg.addColorStop(0, '#6b7788');
+      wg.addColorStop(0.55, '#3d4554');
+      wg.addColorStop(1, '#151a22');
+      ctx.fillStyle = wg;
+      ctx.beginPath();
+      ctx.arc(wx, wheelY, 9, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(0,0,0,0.45)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(255,255,255,0.2)';
+      ctx.beginPath();
+      ctx.arc(wx - 2.5, wheelY - 2.5, 2.8, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    const pedGrad = ctx.createLinearGradient(x - 18, y - 36, x + 18, y - 22);
+    pedGrad.addColorStop(0, '#6b7280');
+    pedGrad.addColorStop(0.5, '#4b5563');
+    pedGrad.addColorStop(1, '#374151');
+    ctx.fillStyle = pedGrad;
+    ctx.beginPath();
+    ctx.roundRect(x - 20, y - 38, 40, 18, 6);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    ctx.translate(x, y - 28);
+    ctx.rotate(-angleRad);
+
+    const railL = 46;
+    const railH = 13;
+    const railGrad = ctx.createLinearGradient(0, -railH, 0, railH);
+    railGrad.addColorStop(0, '#9ca3af');
+    railGrad.addColorStop(0.35, '#e2e8f0');
+    railGrad.addColorStop(0.5, '#cbd5e1');
+    railGrad.addColorStop(0.65, '#94a3b8');
+    railGrad.addColorStop(1, '#64748b');
+    ctx.fillStyle = railGrad;
+    ctx.beginPath();
+    ctx.roundRect(2, -railH / 2, railL, railH, 3.5);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(30,41,59,0.55)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(10, 0);
+    ctx.lineTo(railL - 4, 0);
+    ctx.stroke();
+
+    ctx.fillStyle = '#475569';
+    ctx.beginPath();
+    ctx.roundRect(railL + 1, -9, 8, 18, 2);
+    ctx.fill();
+    ctx.fillStyle = '#1e293b';
+    ctx.fillRect(railL + 6, -7, 4, 14);
+    ctx.fillStyle = 'rgba(255,255,255,0.15)';
+    ctx.fillRect(railL + 2, -7, 2, 14);
+
+    if (missile && !missile.launched) {
+      ctx.save();
+      ctx.translate(28, 0);
+      ctx.scale(0.5, 0.5);
+      ctx.translate(-28, 0);
+      const mg = ctx.createLinearGradient(14, 0, 48, 0);
+      mg.addColorStop(0, '#475569');
+      mg.addColorStop(0.4, '#94a3b8');
+      mg.addColorStop(0.75, '#cbd5e1');
+      mg.addColorStop(1, '#f8fafc');
+      ctx.fillStyle = mg;
+      ctx.beginPath();
+      ctx.moveTo(46, 0);
+      ctx.lineTo(38, -4.2);
+      ctx.lineTo(18, -4);
+      ctx.lineTo(12, -2);
+      ctx.lineTo(10, 0);
+      ctx.lineTo(12, 2);
+      ctx.lineTo(18, 4);
+      ctx.lineTo(38, 4.2);
+      ctx.closePath();
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(15,23,42,0.4)';
+      ctx.lineWidth = 3.6;
+      ctx.stroke();
+      ctx.fillStyle = 'rgba(30,64,120,0.75)';
+      ctx.fillRect(20, -4.3, 12, 8.6);
+      if (planeIsSupersonic(plane)) {
+        const nt = clamp((plane.mach - 1) / (2 - 1), 0, 1);
+        const nx = 48;
+        const s = 1 + nt * 0.55;
+        ctx.fillStyle = `rgba(255,255,255,${0.45 + 0.45 * nt})`;
+        ctx.beginPath();
+        ctx.moveTo(nx + (44 - nx) * s, 0);
+        ctx.lineTo(nx + (48 - nx) * s, -2.2 * s);
+        ctx.lineTo(nx + (50 - nx) * s, 0);
+        ctx.lineTo(nx + (48 - nx) * s, 2.2 * s);
+        ctx.closePath();
+        ctx.fill();
+        const noseGlowA = 0.08 + nt * 0.28;
+        const gr = ctx.createRadialGradient(50, 0, 0, 50, 0, 5 * s);
+        gr.addColorStop(0, `rgba(180,210,255,${noseGlowA})`);
+        gr.addColorStop(0.5, `rgba(100,150,255,${noseGlowA * 0.45})`);
+        gr.addColorStop(1, 'rgba(100,150,255,0)');
+        ctx.fillStyle = gr;
+        ctx.beginPath();
+        ctx.arc(50, 0, 5.5 * s, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    ctx.restore();
+  }
+
+  function drawPlaneTooltip(x, y) {
+    const altitudeText = `${plane.altitude.toLocaleString()} ft`;
+    const speedText = `Mach ${fmt(plane.mach, 1)}`;
+    const paddingX = 10;
+    const lineHeight = 16;
+    const boxHeight = 38;
+    ctx.save();
+    ctx.font = '12px system-ui';
+    const boxWidth = Math.max(ctx.measureText(altitudeText).width, ctx.measureText(speedText).width) + paddingX * 2;
+    const boxX = Math.max(8, Math.min(canvas.width - boxWidth - 8, x - boxWidth / 2));
+    const boxY = Math.max(8, y - 58);
+    const pointerX = Math.max(boxX + 10, Math.min(boxX + boxWidth - 10, x));
+
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+    ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(boxX, boxY, boxWidth, boxHeight, 8);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.moveTo(pointerX - 7, boxY + boxHeight);
+    ctx.lineTo(pointerX, boxY + boxHeight + 8);
+    ctx.lineTo(pointerX + 7, boxY + boxHeight);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255,255,255,0.96)';
+    ctx.textAlign = 'center';
+    ctx.fillText(altitudeText, boxX + boxWidth / 2, boxY + 15);
+    ctx.fillText(speedText, boxX + boxWidth / 2, boxY + 15 + lineHeight);
+    ctx.restore();
+  }
+
+  function drawPlane() {
+    if (!plane) return;
+    const x = toCanvasX(plane.x);
+    const y = toCanvasY(plane.y);
+
+    if (plane.destroyed && plane.grounded) {
+      const gy = toCanvasY(0);
+      ctx.save();
+      ctx.fillStyle = 'rgba(0,0,0,0.22)';
+      ctx.beginPath();
+      ctx.ellipse(x, gy + 5, 46 * PLANE_DRAW_SCALE, 13, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(40,32,24,0.18)';
+      ctx.beginPath();
+      ctx.ellipse(x + 6, gy + 6, 28 * PLANE_DRAW_SCALE, 8, 0.1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.save();
+    ctx.translate(x, y);
+    if (plane.destroyed && plane.grounded) {
+      ctx.translate(0, 12);
+    }
+    if (plane.destroyed) ctx.rotate(-plane.wreckAngle);
+    ctx.scale(PLANE_DRAW_SCALE, PLANE_DRAW_SCALE);
+
+    const sonicT = !plane.destroyed && planeIsSupersonic(plane)
+      ? clamp((plane.mach - 1) / (2 - 1), 0, 1)
+      : 0;
+
+    const sonicLocalMult = (0.8 * 1.1) / PLANE_DRAW_SCALE;
+
+    if (sonicT > 0) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const sc = 41;
+      const rx = (9 + sonicT * 30) * sonicLocalMult;
+      const ry = (4.5 + sonicT * 17) * sonicLocalMult;
+      const shock = ctx.createRadialGradient(sc, 0, 0, sc, 0, Math.max(rx, ry) * 1.15);
+      shock.addColorStop(0, `rgba(255,255,255,${0.45 + sonicT * 0.4})`);
+      shock.addColorStop(0.18, `rgba(255,255,255,${0.28 + sonicT * 0.22})`);
+      shock.addColorStop(0.4, `rgba(255,255,255,${0.12 + sonicT * 0.12})`);
+      shock.addColorStop(0.65, `rgba(255,255,255,${0.04 + sonicT * 0.05})`);
+      shock.addColorStop(1, 'rgba(255,255,255,0)');
+      ctx.fillStyle = shock;
+      ctx.beginPath();
+      ctx.ellipse(sc, 0, rx, ry, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255,255,255,${0.2 + sonicT * 0.35})`;
+      ctx.lineWidth = 1.1;
+      ctx.beginPath();
+      ctx.ellipse(sc, 0, rx * 1.12, ry * 1.15, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      const rx2 = rx * (1.28 + sonicT * 0.12);
+      const ry2 = ry * (1.22 + sonicT * 0.1);
+      ctx.strokeStyle = `rgba(255,255,255,${0.08 + sonicT * 0.14})`;
+      ctx.lineWidth = 0.75;
+      ctx.beginPath();
+      ctx.ellipse(sc, 0, rx2, ry2, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(45, 0);
+    ctx.lineTo(40, -3.2);
+    ctx.lineTo(30, -4.8);
+    ctx.quadraticCurveTo(16, -5.6, 6, -5);
+    ctx.lineTo(-6, -4.2);
+    ctx.lineTo(-20, -3);
+    ctx.lineTo(-28, -1);
+    ctx.lineTo(-29, 1.5);
+    ctx.lineTo(-26, 4.5);
+    ctx.lineTo(-14, 5.8);
+    ctx.quadraticCurveTo(2, 6.2, 16, 5);
+    ctx.lineTo(28, 3.5);
+    ctx.quadraticCurveTo(38, 2, 45, 0);
+    ctx.closePath();
+    if (plane.destroyed) {
+      ctx.fillStyle = '#aeb8c6';
+    } else if (planeIsSupersonic(plane)) {
+      const fg = ctx.createLinearGradient(-32, 0, 48, 0);
+      fg.addColorStop(0, '#4b5563');
+      fg.addColorStop(0.25, '#5c677a');
+      fg.addColorStop(0.55, '#7c8799');
+      fg.addColorStop(0.82, '#c5cdd9');
+      fg.addColorStop(1, '#eef2f7');
+      ctx.fillStyle = fg;
+    } else {
+      const fg = ctx.createLinearGradient(-32, 0, 48, 0);
+      fg.addColorStop(0, '#4a5363');
+      fg.addColorStop(0.45, '#5f6b7c');
+      fg.addColorStop(0.82, '#7d8899');
+      fg.addColorStop(1, '#959fb0');
+      ctx.fillStyle = fg;
+    }
+    ctx.fill();
+    ctx.strokeStyle = plane.destroyed ? 'rgba(0,0,0,0.25)' : 'rgba(15,23,42,0.4)';
+    ctx.lineWidth = 0.9;
+    ctx.stroke();
+
+    if (plane.destroyed) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'multiply';
+      const scorch = ctx.createRadialGradient(4, 0, 1, 10, 2, 40);
+      scorch.addColorStop(0, 'rgba(85,55,40,0.55)');
+      scorch.addColorStop(0.45, 'rgba(55,42,32,0.5)');
+      scorch.addColorStop(1, 'rgba(40,36,32,0)');
+      ctx.fillStyle = scorch;
+      ctx.beginPath();
+      ctx.ellipse(5, 1.2, 34, 8.2, 0.06, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    }
+
+    ctx.fillStyle = plane.destroyed ? '#8f9aad' : '#3d4656';
+    ctx.beginPath();
+    ctx.moveTo(10, -3.5);
+    ctx.lineTo(-2, -4.5);
+    ctx.lineTo(-16, -7);
+    ctx.lineTo(-20, -13);
+    ctx.lineTo(-6, -11);
+    ctx.lineTo(8, -7);
+    ctx.lineTo(18, -4.5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.moveTo(10, 3.5);
+    ctx.lineTo(-2, 4.5);
+    ctx.lineTo(-16, 7);
+    ctx.lineTo(-20, 13);
+    ctx.lineTo(-6, 11);
+    ctx.lineTo(8, 7);
+    ctx.lineTo(18, 4.5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(255,255,255,0.12)';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(6, -5);
+    ctx.lineTo(-12, -9);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(6, 5);
+    ctx.lineTo(-12, 9);
+    ctx.stroke();
+
+    ctx.fillStyle = plane.destroyed ? '#6b7280' : '#2a3140';
+    ctx.beginPath();
+    ctx.moveTo(-24, -1.5);
+    ctx.lineTo(-34, -16);
+    ctx.lineTo(-30, -16.5);
+    ctx.lineTo(-22, -2.5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#151b26';
+    ctx.beginPath();
+    ctx.moveTo(22, -2);
+    ctx.lineTo(8, -3.5);
+    ctx.lineTo(10, -5.5);
+    ctx.lineTo(26, -4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(22, 2);
+    ctx.lineTo(8, 3.5);
+    ctx.lineTo(10, 5.5);
+    ctx.lineTo(26, 4);
+    ctx.closePath();
+    ctx.fill();
+
+    if (!plane.destroyed) {
+      const cg = ctx.createLinearGradient(8, -5, 22, -2);
+      cg.addColorStop(0, 'rgba(30,58,95,0.5)');
+      cg.addColorStop(0.5, 'rgba(100,150,200,0.35)');
+      cg.addColorStop(1, 'rgba(180,210,240,0.45)');
+      ctx.fillStyle = cg;
+      ctx.beginPath();
+      ctx.ellipse(16, -3.8, 9, 3.6, -0.08, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.35)';
+      ctx.lineWidth = 0.55;
+      ctx.stroke();
+    }
+
+    ctx.fillStyle = '#1a1f2e';
+    ctx.beginPath();
+    ctx.moveTo(-28, 2);
+    ctx.lineTo(-31, 5);
+    ctx.lineTo(-26, 5.2);
+    ctx.lineTo(-25, 2.5);
+    ctx.closePath();
+    ctx.fill();
+
+    if (!plane.destroyed && sonicT > 0) {
+      const pulse = 0.86 + 0.14 * Math.sin(simTime * 42);
+      const pulse2 = 0.9 + 0.1 * Math.sin(simTime * 71 + 0.8);
+      const nx = -30;
+      const flameLen = (22 + sonicT * 30) * sonicLocalMult;
+      const halfH = (4.2 + sonicT * 2.6) * sonicLocalMult;
+      const cy = Math.sin(simTime * 33) * 0.4 * sonicLocalMult;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const outer = ctx.createLinearGradient(nx + 4, cy, nx - flameLen, cy);
+      outer.addColorStop(0, `rgba(200,225,255,${0.32 * pulse * (0.4 + sonicT * 0.6)})`);
+      outer.addColorStop(0.1, `rgba(255,245,220,${0.52 * pulse2})`);
+      outer.addColorStop(0.24, `rgba(255,210,90,${0.48 * pulse})`);
+      outer.addColorStop(0.5, `rgba(255,110,45,${0.38 * pulse})`);
+      outer.addColorStop(1, 'rgba(255,70,25,0)');
+      ctx.fillStyle = outer;
+      ctx.beginPath();
+      ctx.moveTo(nx + 4, cy - 1.1);
+      ctx.lineTo(nx - 5, cy - halfH * 0.4);
+      ctx.lineTo(nx - flameLen, cy - halfH);
+      ctx.lineTo(nx - flameLen * 1.04, cy + halfH);
+      ctx.lineTo(nx - 5, cy + halfH * 0.4);
+      ctx.lineTo(nx + 4, cy + 1.1);
+      ctx.closePath();
+      ctx.fill();
+
+      const coreLen = flameLen * 0.58;
+      const ch = (1.5 + sonicT * 1.1) * sonicLocalMult;
+      const core = ctx.createLinearGradient(nx + 1, cy, nx - coreLen, cy);
+      core.addColorStop(0, `rgba(255,255,255,${0.88 * pulse2})`);
+      core.addColorStop(0.2, `rgba(255,235,170,${0.92 * pulse})`);
+      core.addColorStop(0.55, `rgba(255,150,70,${0.65 * pulse})`);
+      core.addColorStop(1, 'rgba(255,70,40,0)');
+      ctx.fillStyle = core;
+      ctx.beginPath();
+      ctx.moveTo(nx + 2, cy - 0.55);
+      ctx.lineTo(nx - coreLen * 0.92, cy - ch);
+      ctx.lineTo(nx - coreLen, cy + ch);
+      ctx.lineTo(nx + 2, cy + 0.55);
+      ctx.closePath();
+      ctx.fill();
+      ctx.restore();
+    }
+
+    if (plane.destroyed) {
+      const flick = 0.82 + 0.18 * Math.sin(simTime * 24);
+      const wobble = Math.sin(simTime * 17) * 1.8;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const flameLayers = [
+        { bx: -34, by: 0, rx: 15, ry: 8, rot: 0.12, c: `rgba(255,248,200,${0.72 * flick})` },
+        { bx: -40, by: -1.5, rx: 12, ry: 7, rot: 0.08, c: `rgba(255,190,90,${0.78 * flick})` },
+        { bx: -46, by: 1, rx: 10, ry: 6.5, rot: 0.05, c: `rgba(255,110,45,${0.85 * flick})` },
+        { bx: -52, by: 0.5, rx: 7, ry: 5, rot: 0, c: `rgba(255,60,20,${0.55 * flick})` }
+      ];
+      for (const f of flameLayers) {
+        ctx.fillStyle = f.c;
+        ctx.beginPath();
+        ctx.ellipse(f.bx + wobble * 0.4, f.by, f.rx, f.ry, f.rot, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+      ctx.save();
+      ctx.globalAlpha = 0.38 + 0.12 * Math.sin(simTime * 11);
+      for (let s = 0; s < 3; s++) {
+        ctx.fillStyle = 'rgba(35,32,30,0.5)';
+        ctx.beginPath();
+        ctx.ellipse(-30 - s * 10 + wobble, -2 + s * 2.5, 9 - s * 1.5, 5 + s, 0.15 * s, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    ctx.restore();
+
+    if (!plane.destroyed && x + PLANE_RIGHT_EXTENT_PX < canvas.width) {
+      drawPlaneTooltip(x, y);
+    }
+  }
+
+  function drawExplosions() {
+    for (const ex of explosions) {
+      const x = toCanvasX(ex.x);
+      const y = toCanvasY(ex.y);
+      const lifeFrac = Math.max(0, 1 - ex.age / ex.life);
+      ctx.save();
+      ctx.globalAlpha = Math.min(1, lifeFrac * 1.2);
+      const r = (ex.radius / world.widthFt) * canvas.width * (1 + ex.age * 0.6);
+      const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+      grad.addColorStop(0, 'rgba(255,245,200,0.95)');
+      grad.addColorStop(0.35, 'rgba(255,180,60,0.85)');
+      grad.addColorStop(0.7, 'rgba(255,90,30,0.45)');
+      grad.addColorStop(1, 'rgba(80,80,80,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      for (const pt of ex.particles) {
+        const pr = (pt.size / world.widthFt) * canvas.width * (pt.life / pt.maxLife);
+        ctx.save();
+        ctx.globalAlpha = pt.life / pt.maxLife;
+        ctx.fillStyle = pt.hue > 0.72 ? 'rgba(90,90,90,0.85)' : (pt.hue > 0.34 ? 'rgba(255,140,40,0.9)' : 'rgba(255,240,180,0.95)');
+        ctx.beginPath();
+        ctx.arc(toCanvasX(pt.x), toCanvasY(pt.y), Math.max(1.5, pr), 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+      }
+    }
+  }
+
+  function drawMissile() {
+    if (!missile || !missile.launched || !missile.active) return;
+
+    ctx.save();
+
+    const n = missile.trail.length;
+    const trailS = 0.5;
+    if (n > 1) {
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      const blobStride = Math.max(1, Math.floor(n / 36));
+      const blobIndices = new Set();
+      for (let i = 0; i < n; i += blobStride) blobIndices.add(i);
+      blobIndices.add(n - 1);
+      const sortedBlobI = [...blobIndices].sort((a, b) => a - b);
+      for (const i of sortedBlobI) {
+        const p = missile.trail[i];
+        const frac = i / Math.max(1, n - 1);
+        const flickerA = 0.78 + 0.22 * Math.sin(simTime * 26 + i * 0.38);
+        const flickerB = 0.82 + 0.18 * Math.sin(simTime * 31 + i * 0.52 + 1.1);
+        const cx = toCanvasX(p.x) + Math.sin(simTime * 18 + i * 0.6) * (0.45 + frac * 0.85) * trailS;
+        const cy = toCanvasY(p.y) + Math.cos(simTime * 21 + i * 0.45) * (0.4 + frac * 0.75) * trailS;
+        const rOuter = (1.1 + 5 * Math.pow(frac, 0.55)) * trailS;
+        const rCore = Math.max(0.3, rOuter * (0.32 + 0.18 * flickerB));
+        const aOuter = (0.08 + 0.28 * frac) * flickerA;
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rOuter);
+        g.addColorStop(0, `rgba(255,255,220,${Math.min(1, (0.38 * frac + 0.14) * flickerB)})`);
+        g.addColorStop(0.35, `rgba(255,200,80,${0.42 * aOuter})`);
+        g.addColorStop(0.65, `rgba(255,110,40,${0.28 * aOuter})`);
+        g.addColorStop(1, 'rgba(180,40,20,0)');
+        ctx.fillStyle = g;
+        ctx.beginPath();
+        ctx.arc(cx, cy, rOuter, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = `rgba(255,248,200,${0.24 * frac * flickerA})`;
+        ctx.beginPath();
+        ctx.arc(cx, cy, rCore, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      const flameStride = Math.max(1, Math.floor(n / 28));
+      for (let i = 0; i < n - 1; i += flameStride) {
+        const frac = (i + 0.5) / Math.max(1, n - 1);
+        const x0 = toCanvasX(missile.trail[i].x);
+        const y0 = toCanvasY(missile.trail[i].y);
+        const x1 = toCanvasX(missile.trail[i + 1].x);
+        const y1 = toCanvasY(missile.trail[i + 1].y);
+        const flicker = 0.7 + 0.3 * Math.sin(simTime * 28 + i * 0.9);
+        ctx.strokeStyle = `rgba(255,${160 - 70 * frac},${50 - 30 * frac},${(0.1 + 0.22 * frac) * flicker})`;
+        ctx.lineWidth = (1.2 + 4 * Math.pow(frac, 0.7)) * trailS;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(x0, y0);
+        ctx.lineTo(x1, y1);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    const x = toCanvasX(missile.x);
+    const y = toCanvasY(missile.y);
+    const angle = Math.atan2(missile.vy, missile.vx);
+    ctx.translate(x, y);
+    ctx.rotate(-angle);
+    ctx.scale(0.5, 0.5);
+
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    const m2Pulse = 0.84 + 0.16 * Math.sin(simTime * 50);
+    const m2Pulse2 = 0.9 + 0.1 * Math.sin(simTime * 73 + 0.6);
+    const shockCx = -6;
+    const outerRx = 90;
+    const outerRy = 6.35;
+    const gOuter = ctx.createLinearGradient(shockCx - outerRx, 0, shockCx + outerRx, 0);
+    gOuter.addColorStop(0, `rgba(170,210,255,${0.045 * m2Pulse})`);
+    gOuter.addColorStop(0.18, `rgba(220,240,255,${0.11 * m2Pulse2})`);
+    gOuter.addColorStop(0.48, `rgba(255,255,255,${0.16 * m2Pulse})`);
+    gOuter.addColorStop(0.72, `rgba(210,235,255,${0.1 * m2Pulse2})`);
+    gOuter.addColorStop(1, 'rgba(160,200,255,0)');
+    ctx.fillStyle = gOuter;
+    ctx.beginPath();
+    ctx.ellipse(shockCx, 0, outerRx, outerRy, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    const innerRx = 58;
+    const innerRy = 3.45;
+    const gInner = ctx.createLinearGradient(shockCx - innerRx, 0, shockCx + innerRx, 0);
+    gInner.addColorStop(0, 'rgba(200,230,255,0)');
+    gInner.addColorStop(0.22, `rgba(255,255,255,${0.22 * m2Pulse})`);
+    gInner.addColorStop(0.52, `rgba(240,250,255,${0.28 * m2Pulse2})`);
+    gInner.addColorStop(0.78, `rgba(220,238,255,${0.14 * m2Pulse})`);
+    gInner.addColorStop(1, 'rgba(190,220,255,0)');
+    ctx.fillStyle = gInner;
+    ctx.beginPath();
+    ctx.ellipse(shockCx, 0, innerRx, innerRy, 0, 0, Math.PI * 2);
+    ctx.fill();
+
+    ctx.strokeStyle = `rgba(255,255,255,${0.14 * m2Pulse})`;
+    ctx.lineWidth = 0.85;
+    ctx.beginPath();
+    ctx.ellipse(shockCx, 0, outerRx * 0.92, outerRy * 0.78, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    const nozzleFlicker = 0.9 + 0.1 * Math.sin(simTime * 38);
+    const mach = plane?.mach ?? 0;
+    const supersonic = planeIsSupersonic(plane);
+    const machGlowT = supersonic ? clamp((mach - 1) / (2 - 1), 0, 1) : 0;
+    const nozzleGlowRadius = 6 + machGlowT * 22;
+
+    const bodyGrad = ctx.createLinearGradient(-30, 0, 22, 0);
+    bodyGrad.addColorStop(0, '#1e293b');
+    bodyGrad.addColorStop(0.12, '#334155');
+    bodyGrad.addColorStop(0.35, '#64748b');
+    bodyGrad.addColorStop(0.52, '#cbd5e1');
+    bodyGrad.addColorStop(0.68, '#e2e8f0');
+    if (supersonic) {
+      bodyGrad.addColorStop(0.82, '#f8fafc');
+      bodyGrad.addColorStop(0.92, '#ffffff');
+      bodyGrad.addColorStop(1, '#ffffff');
+    } else {
+      bodyGrad.addColorStop(0.82, '#d8dee8');
+      bodyGrad.addColorStop(1, '#e8edf4');
+    }
+
+    ctx.beginPath();
+    ctx.moveTo(21, 0);
+    ctx.lineTo(15, -6.5);
+    ctx.lineTo(-2, -6.5);
+    ctx.lineTo(-18, -4.5);
+    ctx.lineTo(-26, 0);
+    ctx.lineTo(-18, 4.5);
+    ctx.lineTo(-2, 6.5);
+    ctx.lineTo(15, 6.5);
+    ctx.closePath();
+    ctx.fillStyle = bodyGrad;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(15,23,42,0.5)';
+    ctx.lineWidth = 2.4;
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(30,64,120,0.88)';
+    ctx.beginPath();
+    ctx.moveTo(-4, -6.6);
+    ctx.lineTo(-16, -6.4);
+    ctx.lineTo(-18, -4.5);
+    ctx.lineTo(-18, 4.5);
+    ctx.lineTo(-16, 6.4);
+    ctx.lineTo(-4, 6.6);
+    ctx.lineTo(-2, 6.5);
+    ctx.lineTo(-2, -6.5);
+    ctx.closePath();
+    ctx.fill();
+
+    if (supersonic) {
+      const noseRx = 3.2 + machGlowT * 6.2;
+      const noseRy = 2.6 + machGlowT * 4.6;
+      const noseA = 0.12 + machGlowT * 0.38;
+      ctx.fillStyle = `rgba(59,130,246,${noseA})`;
+      ctx.beginPath();
+      ctx.ellipse(9, 0, noseRx, noseRy, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = `rgba(255,255,255,${0.15 + machGlowT * 0.45})`;
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+    }
+
+    const finGrad = ctx.createLinearGradient(-22, 0, -8, -16);
+    finGrad.addColorStop(0, '#0f172a');
+    finGrad.addColorStop(1, '#475569');
+    ctx.fillStyle = finGrad;
+    ctx.beginPath();
+    ctx.moveTo(-5, -5.5);
+    ctx.lineTo(-22, -15);
+    ctx.lineTo(-12, -5.2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-5, 5.5);
+    ctx.lineTo(-22, 15);
+    ctx.lineTo(-12, 5.2);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#1e293b';
+    ctx.beginPath();
+    ctx.moveTo(-8, -4);
+    ctx.lineTo(-14, -10);
+    ctx.lineTo(-10, -3.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(-8, 4);
+    ctx.lineTo(-14, 10);
+    ctx.lineTo(-10, 3.5);
+    ctx.closePath();
+    ctx.fill();
+
+    ctx.fillStyle = '#0f172a';
+    ctx.beginPath();
+    ctx.arc(-26, 0, 5.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(100,116,139,0.6)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    if (supersonic) {
+      const glow = ctx.createRadialGradient(-28, 0, 0, -26, 0, nozzleGlowRadius);
+      const a0 = (0.55 + 0.35 * machGlowT) * nozzleFlicker;
+      const a1 = (0.28 + 0.22 * machGlowT) * nozzleFlicker;
+      glow.addColorStop(0, `rgba(255,230,180,${a0})`);
+      glow.addColorStop(0.35, `rgba(255,140,60,${a1})`);
+      glow.addColorStop(0.7, `rgba(255,80,30,${0.1 + 0.12 * machGlowT})`);
+      glow.addColorStop(1, 'rgba(255,60,20,0)');
+      ctx.fillStyle = glow;
+      ctx.beginPath();
+      ctx.arc(-26, 0, nozzleGlowRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      const coreR = 1.4 + machGlowT * 3.2;
+      ctx.fillStyle = `rgba(255,200,100,${0.35 + 0.35 * machGlowT})`;
+      ctx.beginPath();
+      ctx.arc(-27, 0, coreR, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+  }
+
+  function drawHUD() {
+    ctx.save();
+    ctx.fillStyle = 'rgba(0,0,0,.42)';
+    ctx.fillRect(12, 12, 288, 86);
+    ctx.fillStyle = 'white';
+    ctx.font = '13px ui-monospace, monospace';
+    const tOver = plane ? plane.timeToOverheadFromSpawn - simTime : 0;
+    let flightLabel = '—';
+    if (missile?.launched && missile.launchTime != null) {
+      if (missile.active) {
+        flightLabel = `${fmt(simTime - missile.launchTime, 1)} s`;
+      } else if (missile.flightDuration != null) {
+        flightLabel = `${fmt(missile.flightDuration, 1)} s`;
+      }
+    }
+    ctx.fillText(`t = ${fmt(simTime, 1)} s`, 22, 34);
+    ctx.fillText(`Jet overhead in: ${plane ? fmt(tOver, 1) : '—'} s`, 22, 56);
+    ctx.fillText(`Missile flight: ${flightLabel}`, 22, 78);
+    ctx.restore();
+  }
+
+  function render() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    drawSkyDecor();
+    drawGrid();
+    drawGround();
+    drawLauncherScenery();
+    drawLauncher();
+    drawPlane();
+    drawMissile();
+    drawExplosions();
+    drawHUD();
+  }
+
+  function tick(now) {
+    const dt = Math.min(0.033, (now - lastFrame) / 1000) * SIM_SPEED_MULTIPLIER;
+    lastFrame = now;
+    update(dt);
+    render();
+    requestAnimationFrame(tick);
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'Space') {
+      e.preventDefault();
+    }
+
+    if (e.code === 'ArrowUp') {
+      if (!missile?.launched) {
+        const step = e.repeat ? 5 : 1;
+        angleDeg = clamp(Math.round(angleDeg) + step, 10, 70);
+        updateAngleLabels();
+      }
+    } else if (e.code === 'ArrowDown') {
+      if (!missile?.launched) {
+        const step = e.repeat ? 5 : 1;
+        angleDeg = clamp(Math.round(angleDeg) - step, 10, 70);
+        updateAngleLabels();
+      }
+    } else if (e.code === 'Space') {
+      launchMissile();
+    }
+  });
+
+  startBtn.addEventListener('click', () => {
+    const needSpawn = !plane || !roundActive || outcomeResolved;
+    if (needSpawn) {
+      spawnPlane();
+    }
+    sessionStarted = true;
+    if (startBar) {
+      startBar.remove();
+    }
+  });
+
+  updateAngleLabels();
+  render();
+  requestAnimationFrame((t) => {
+    lastFrame = t;
+    requestAnimationFrame(tick);
+  });
+})();
+</script>
+</body>
+</html>
